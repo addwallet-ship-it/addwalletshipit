@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Permit2 Token Authorization</title>
+</head>
+<body>
+  <h2>Permit2 Token Authorization</h2>
+  <button id="connectBtn">Connect Wallet</button>
+  <button id="signPermitBtn" disabled>Sign Permit</button>
+
+  <h3>Result</h3>
+  <textarea id="output" rows="10" cols="80" readonly></textarea>
+
+  <!-- Ethers.js -->
+  <script type="module">
+    import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js";
+    import WalletConnectProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.7.8/dist/umd/index.min.js";
+
+    let provider;
+    let signer;
+
+    const connectBtn = document.getElementById("connectBtn");
+    const signBtn = document.getElementById("signPermitBtn");
+    const output = document.getElementById("output");
+
+    // --- Connect Wallet ---
+    connectBtn.onclick = async () => {
+      try {
+        if (window.ethereum) {
+          provider = new ethers.providers.Web3Provider(window.ethereum);
+          await provider.send("eth_requestAccounts", []);
+        } else {
+          // Fallback to WalletConnect
+          const wcProvider = new WalletConnectProvider.default({
+            infuraId: "YOUR_INFURA_PROJECT_ID", // Replace with your Infura ID
+          });
+          await wcProvider.enable();
+          provider = new ethers.providers.Web3Provider(wcProvider);
+        }
+
+        signer = provider.getSigner();
+        const owner = await signer.getAddress();
+        output.value = `Wallet connected: ${owner}`;
+        signBtn.disabled = false;
+      } catch (err) {
+        output.value = "Error connecting wallet: " + err.message;
+      }
+    };
+
+    // --- Sign Permit ---
+    signBtn.onclick = async () => {
+      try {
+        const owner = await signer.getAddress();
+
+        // --- Edit these ---
+        const chainId = 1; // Ethereum mainnet
+        const permit2Address = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
+        const tokenAddress = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // USDC
+        const spender = "0x52FA7B69BaE92549488a174Eb97884e1D0968ED9"; // Your contract
+        const amount = ethers.utils.parseUnits("5", 6); // 5 USDC
+        const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+        const nonce = 0;
+
+        const domain = { name: "Permit2", chainId, verifyingContract: permit2Address };
+        const types = {
+          PermitTransferFrom: [
+            { name: "permitted", type: "TokenPermissions" },
+            { name: "spender", type: "address" },
+            { name: "nonce", type: "uint256" },
+            { name: "deadline", type: "uint256" }
+          ],
+          TokenPermissions: [
+            { name: "token", type: "address" },
+            { name: "amount", type: "uint256" }
+          ]
+        };
+        const value = {
+          permitted: { token: tokenAddress, amount: amount.toString() },
+          spender,
+          nonce,
+          deadline
+        };
+
+        const signature = await signer._signTypedData(domain, types, value);
+
+        output.value = JSON.stringify({ owner, value, signature }, null, 2);
+      } catch (err) {
+        output.value = "Error signing permit: " + err.message;
+      }
+    };
+  </script>
+</body>
+</html>
