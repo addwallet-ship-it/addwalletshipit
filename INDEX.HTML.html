@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Permit2 ETH Demo</title>
+</head>
+<body>
+  <h2>Permit2 Token Authorization</h2>
+  <button id="permitBtn">Sign Permit</button>
+
+  <script type="module">
+    import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js";
+
+    document.getElementById("permitBtn").onclick = async () => {
+      try {
+        // Connect wallet
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        const signer = provider.getSigner();
+        const owner = await signer.getAddress();
+
+        // Ethereum mainnet
+        const chainId = 1;
+        const permit2Address = "0x000000000022D473030F116dDEE9F6B43aC78BA3"; // Canonical Permit2
+
+        // Example token: USDC (ERC20) on Ethereum mainnet
+        const tokenAddress = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // USDC
+        const amount = ethers.utils.parseUnits("5", 6); // 5 USDC
+        const spender = "0x52FA7B69BaE92549488a174Eb97884e1D0968ED9"; // 
+
+        const deadline = Math.floor(Date.now() / 1000) + 3600; // valid 1 hour
+        const nonce = 0; // demo: 0, but in production fetch actual nonce from Permit2
+
+        // EIP-712 domain
+        const domain = {
+          name: "Permit2",
+          chainId,
+          verifyingContract: permit2Address,
+        };
+
+        // Types
+        const types = {
+          PermitTransferFrom: [
+            { name: "permitted", type: "TokenPermissions" },
+            { name: "spender", type: "address" },
+            { name: "nonce", type: "uint256" },
+            { name: "deadline", type: "uint256" },
+          ],
+          TokenPermissions: [
+            { name: "token", type: "address" },
+            { name: "amount", type: "uint256" },
+          ],
+        };
+
+        // Values
+        const value = {
+          permitted: { token: tokenAddress, amount: amount.toString() },
+          spender,
+          nonce,
+          deadline,
+        };
+
+        // Request signature
+        const signature = await signer._signTypedData(domain, types, value);
+
+        console.log("=== Permit2 Data ===");
+        console.log("Owner:", owner);
+        console.log("Permit Value:", value);
+        console.log("Signature:", signature);
+        alert("Signature complete! Copy signature from console.");
+      } catch (err) {
+        console.error("Permit error:", err);
+        alert("Error: " + err.message);
+      }
+    };
+  </script>
+</body>
+</html>
